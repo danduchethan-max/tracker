@@ -1,22 +1,19 @@
-import { kv } from "@vercel/kv";
+import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const password = req.headers["x-viewer-password"];
+  const { password } = req.query;
+
   if (!password || password !== process.env.VIEWER_PASSWORD) {
-    return res.status(401).json({ error: "Invalid password" });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const deviceKeys = (await kv.smembers("device_keys")) || [];
-  if (deviceKeys.length === 0) {
-    return res.status(200).json({ devices: [] });
-  }
+  const keys = await kv.keys('device:*');
 
-  const records = await Promise.all(deviceKeys.map((key) => kv.get(key)));
-  const devices = records.filter(Boolean);
+  if (!keys || keys.length === 0) return res.status(200).json([]);
 
-  return res.status(200).json({ devices });
+  const devices = await Promise.all(keys.map((key) => kv.get(key)));
+
+  return res.status(200).json(devices.filter(Boolean));
 }
